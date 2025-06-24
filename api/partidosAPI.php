@@ -1,8 +1,33 @@
 <?php
-// partidoAPI.php - API para manejar partidos
+session_start(); // Iniciar sesión al principio de cada API
+
+// Definir APIs/métodos GET que NO requieren autenticación (la mayoría de tu panel no deberían ser públicos)
+$public_get_allowed_apis = [
+    // Si necesitas que categoriaAPI.php sea accesible sin login, añádelo aquí
+    // 'categoriaAPI.php', 
+    // Si la vista de estadísticas fuera pública sin login, podrías poner 'estadisticasAPI.php' aquí
+];
+
+$current_script_name = basename($_SERVER['PHP_SELF']);
+
+// Regla de Protección:
+// Si la sesión no está iniciada
+// Y la petición NO es un GET a una API permitida públicamente
+if (
+    !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true // No logueado
+    && !(
+        $_SERVER['REQUEST_METHOD'] === 'GET' && 
+        in_array($current_script_name, $public_get_allowed_apis)
+    )
+) {
+    http_response_code(401); // 401 Unauthorized
+    echo json_encode(['success' => false, 'message' => 'Acceso no autorizado. Inicia sesión para realizar esta acción.']);
+    exit();
+}
+
 header('Access-Control-Allow-Origin: *');
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS'); // Métodos para CRUD
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS'); 
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 // Manejar preflight requests
@@ -11,27 +36,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-require_once '../config/conexion.php'; // Asegúrate de que la ruta es correcta
+require_once '../config/conexion.php'; 
 
 try {
     $method = $_SERVER['REQUEST_METHOD'];
 
     switch ($method) {
         case 'GET':
-            // Lógica para obtener partidos (con o sin filtro de categoría)
-            $id_categoria = isset($_GET['id_categoria']) ? $_GET['id_categoria'] : null;
-            obtenerPartidos($conn, $id_categoria);
+            // Nuevo: Si se envía un id_partido_detalle, obtener sus detalles
+            if (isset($_GET['id_partido_detalle'])) { 
+                obtenerDetallePartidoAPI($conn, $_GET['id_partido_detalle']);
+            } 
+            // Lógica existente para obtener partidos (con o sin filtro de categoría)
+            elseif (isset($_GET['id_categoria'])) { 
+                obtenerPartidos($conn, $_GET['id_categoria']);
+            } 
+            else { 
+                obtenerPartidos($conn);
+            }
             break;
         case 'POST':
-            // Lógica para registrar un nuevo partido
             $data = json_decode(file_get_contents('php://input'), true);
             if (!$data) {
                 jsonResponse(['success' => false, 'message' => 'Datos JSON inválidos'], 400);
             }
-            registrarPartido($conn, $data);
+            registrarPartido($conn, $data); 
             break;
         case 'PUT':
-            // Lógica para actualizar un partido existente
             $data = json_decode(file_get_contents('php://input'), true);
             if (!$data || !isset($data['id_partido'])) {
                 jsonResponse(['success' => false, 'message' => 'Datos JSON inválidos o ID de partido faltante'], 400);
@@ -39,7 +70,6 @@ try {
             actualizarPartido($conn, $data);
             break;
         case 'DELETE':
-            // Lógica para eliminar un partido
             $id_partido = isset($_GET['id_partido']) ? $_GET['id_partido'] : null;
             if (!$id_partido) {
                 jsonResponse(['success' => false, 'message' => 'ID de partido faltante para eliminar'], 400);
@@ -53,7 +83,6 @@ try {
 } catch (Exception $e) {
     jsonResponse(['success' => false, 'message' => 'Error del servidor: ' . $e->getMessage()], 500);
 } finally {
-    // Cerrar la conexión
     if (isset($conn)) {
         $conn->close();
     }
@@ -65,9 +94,8 @@ function obtenerPartidos($conn, $id_categoria = null) {
     try {
         $stmt = $conn->prepare($sql);
         
-        // Ajuste para el parámetro de categoría si tu SP espera 0 o un entero para "todos"
-        $param_categoria = ($id_categoria === null || $id_categoria === '') ? 0 : (int)$id_categoria; // Usar 0 para "todas las categorías"
-        $stmt->bind_param("i", $param_categoria); // "i" para entero
+        $param_categoria = ($id_categoria === null || $id_categoria === '') ? 0 : (int)$id_categoria; 
+        $stmt->bind_param("i", $param_categoria); 
 
         $stmt->execute();
         $resultado = $stmt->get_result();
@@ -91,27 +119,24 @@ function registrarPartido($conn, $data) {
     $hora = $data['hora'];
     $rival = $data['rival'];
     $local_visitante = $data['local_visitante'];
-    $id_categoria = (int)$data['id_categoria']; // Asegurar que sea INT
+    $id_categoria = (int)$data['id_categoria']; 
     
     $goles_favor = isset($data['goles_favor']) ? (int)$data['goles_favor'] : 0;
     $goles_contra = isset($data['goles_contra']) ? (int)$data['goles_contra'] : 0;
     $resultado = "{$goles_favor}-{$goles_contra}"; 
 
-    // Llamar al SP con un parámetro OUT para capturar el ID
     $sql = "CALL registrarPartidos(?, ?, ?, ?, ?, ?, @p_id_partido_insertado)"; 
 
     try {
         $stmt = $conn->prepare($sql);
-        // Bindear los 6 parámetros de entrada (sssssi)
         $stmt->bind_param("sssssi", $fecha, $hora, $rival, $local_visitante, $resultado, $id_categoria);
         
         if ($stmt->execute()) {
-            // Después de ejecutar el SP, seleccionar el valor del parámetro OUT
             $result_query = $conn->query("SELECT @p_id_partido_insertado AS id_partido_generado");
             $inserted_id_row = $result_query->fetch_assoc();
             $inserted_id = $inserted_id_row['id_partido_generado'];
 
-            if ($inserted_id === null || $inserted_id == 0) { // En caso de que el SP por algún error devuelva NULL o 0
+            if ($inserted_id === null || $inserted_id == 0) { 
                 jsonResponse(['success' => false, 'message' => 'Partido registrado, pero no se pudo obtener el ID (SP no devolvió ID válido).', 'debug_id' => $inserted_id], 500);
             } else {
                 jsonResponse(['success' => true, 'message' => 'Partido registrado exitosamente', 'id_partido' => $inserted_id]);
@@ -124,9 +149,7 @@ function registrarPartido($conn, $data) {
     }
 }
 
-
 function actualizarPartido($conn, $data) {
-    // Validar datos mínimos, incluido el ID
     if (!isset($data['id_partido'], $data['fecha'], $data['hora'], $data['rival'], $data['local_visitante'], $data['id_categoria'])) {
         jsonResponse(['success' => false, 'message' => 'Faltan datos obligatorios para actualizar el partido'], 400);
     }
@@ -142,8 +165,7 @@ function actualizarPartido($conn, $data) {
     $goles_contra = isset($data['goles_contra']) ? (int)$data['goles_contra'] : 0;
     $resultado = "{$goles_favor}-{$goles_contra}";
 
-    // Asumiendo un procedimiento almacenado para actualizar
-    $sql = "CALL actualizarPartido(?, ?, ?, ?, ?, ?, ?)"; // id_partido, fecha, hora, rival, local_visitante, resultado, id_categoria
+    $sql = "CALL actualizarPartido(?, ?, ?, ?, ?, ?, ?)"; 
 
     try {
         $stmt = $conn->prepare($sql);
@@ -164,8 +186,7 @@ function actualizarPartido($conn, $data) {
 }
 
 function eliminarPartido($conn, $id_partido) {
-    // Asumiendo un procedimiento almacenado para eliminar
-    $sql = "CALL eliminarPartido(?)"; // id_partido
+    $sql = "CALL eliminarPartido(?)"; 
 
     try {
         $stmt = $conn->prepare($sql);
@@ -182,6 +203,51 @@ function eliminarPartido($conn, $id_partido) {
         }
     } catch (Exception $e) {
         jsonResponse(['success' => false, 'message' => 'Error al eliminar partido: ' . $e->getMessage()], 500);
+    }
+}
+
+// ¡NUEVA FUNCIÓN! Para obtener los detalles de un partido con sus jugadores
+function obtenerDetallePartidoAPI($conn, $id_partido) {
+    try {
+        $stmt = $conn->prepare("CALL obtenerDetallesPartidoConJugadores(?)");
+        $stmt->bind_param("i", $id_partido);
+        $stmt->execute();
+
+        // Primer conjunto de resultados: Detalles del Partido
+        // Usamos store_result() para asegurar que podemos movernos a next_result()
+        $stmt->store_result(); 
+        $partido_detalle = [];
+        $meta = $stmt->result_metadata();
+        $fields = [];
+        foreach ($meta->fetch_fields() as $field) {
+            $fields[] = &$partido_detalle[$field->name];
+        }
+        call_user_func_array([$stmt, 'bind_result'], $fields);
+        $stmt->fetch(); // Obtener la primera (y única) fila del partido_detalle
+        $stmt->free_result(); // Liberar el primer conjunto de resultados
+
+        $stmt->next_result(); // Mover al siguiente conjunto de resultados
+
+        // Segundo conjunto de resultados: Estadísticas de Jugadores
+        $jugadores_stats = [];
+        $result_jugadores = $stmt->get_result(); // get_result() es más sencillo después de next_result()
+
+        while ($fila = $result_jugadores->fetch_assoc()) {
+            $jugadores_stats[] = $fila;
+        }
+        $stmt->close(); // Cerrar el statement después de obtener todos los resultados
+
+        if ($partido_detalle) {
+            jsonResponse([
+                'success' => true,
+                'partido' => $partido_detalle,
+                'jugadores_stats' => $jugadores_stats
+            ]);
+        } else {
+            jsonResponse(['success' => false, 'message' => 'Partido no encontrado'], 404);
+        }
+    } catch (Exception $e) {
+        jsonResponse(['success' => false, 'message' => 'Error al obtener detalles del partido: ' . $e->getMessage()], 500);
     }
 }
 ?>

@@ -1,9 +1,9 @@
 ﻿// ============================
 // VARIABLES GLOBALES
 // ============================
-let allPartidos = []; // Para almacenar todos los partidos cargados
-let allCategorias = []; // Para almacenar todas las categorías cargadas
-let partidoEditandoId = null; // Para saber si estamos editando o creando un partido nuevo
+let allPartidos = []; 
+let allCategorias = []; 
+let partidoEditandoId = null; 
 
 // Referencias a elementos del layout
 const menuToggle = document.getElementById('menuToggle');
@@ -12,32 +12,45 @@ const overlay = document.getElementById('overlay');
 const profileToggle = document.getElementById('profileToggle');
 const profileDropdown = document.getElementById('profileDropdown');
 
-// Referencias a elementos de la vista de Partidos
+// Referencias a elementos de la vista de Partidos (TABLA PRINCIPAL y FILTROS)
 const tablaPartidosBody = document.getElementById('tablaPartidos');
 const totalPartidosSpan = document.getElementById('totalPartidos');
-const filterCategoriaSelect = document.getElementById('filterCategoria'); // El único filtro
+const filterCategoriaSelect = document.getElementById('filterCategoria'); 
 const btnNuevoPartido = document.getElementById('btnNuevoPartido');
-const btnDescargarInforme = document.getElementById('btnDescargarInforme'); // Si existe en tu HTML
+const btnDescargarInforme = document.getElementById('btnDescargarInforme'); 
 
-// Referencias al modal de Partido
+// Referencias al modal de Partido (Nuevo/Editar)
 const modalPartido = document.getElementById('modalPartido');
 const formPartido = document.getElementById('formPartido');
 const modalTitle = document.getElementById('modalTitle');
 const btnCancelarModal = document.getElementById('btnCancelar'); 
 const selectCategoriaModal = document.getElementById('id_categoria'); 
-const partidoIdInput = document.getElementById('partidoId'); // Campo oculto para el ID del partido
+const partidoIdInput = document.getElementById('partidoId'); 
 
-// Referencias a elementos de los pasos del modal
+// Referencias a elementos de los pasos del modal (Nuevo/Editar)
 const paso1InfoPartido = document.getElementById('paso1InfoPartido');
 const paso2EstadisticasJugadores = document.getElementById('paso2EstadisticasJugadores');
 
-// Referencias a los botones de navegación de los pasos
-const btnGuardarPaso1 = document.getElementById('btnGuardarPaso1'); // El botón original 'Guardar Partido y Continuar'
+// Referencias a los botones de navegación de los pasos (Nuevo/Editar)
+const btnGuardarPaso1 = document.getElementById('btnGuardarPaso1'); 
 const btnAtrasPaso2 = document.getElementById('btnAtrasPaso2');
 const btnGuardarPaso2 = document.getElementById('btnGuardarPaso2');
 
-// Referencia a la tabla de estadísticas de jugadores dentro del modal
+// Referencia a la tabla de estadísticas de jugadores DENTRO del modal de Nuevo/Editar Partido (Paso 2)
 const tablaEstadisticasJugadores = document.getElementById('tablaEstadisticasJugadores');
+
+// ============================
+// REFERENCIAS GLOBALES PARA EL MODAL DE DETALLES DEL PARTIDO (OBTENIDAS EN DOMContentLoaded)
+// Se declaran aquí, pero su valor se asigna en DOMContentLoaded
+// ============================
+let modalDetallePartido;
+let btnCloseDetalleModal;
+let detalleFechaHora;
+let detalleRival;
+let detalleLocalia;
+let detalleResultado;
+let detalleCategoria;
+let tablaDetalleJugadoresStats;
 
 
 // ============================
@@ -45,13 +58,11 @@ const tablaEstadisticasJugadores = document.getElementById('tablaEstadisticasJug
 // ============================
 
 function toggleMenu() {
-    // Usar 'open' para coincidir con tu CSS
     if (sidebar) sidebar.classList.toggle('open');
     if (overlay) overlay.classList.toggle('open');
 }
 
 function toggleProfile() {
-    // Usar 'open' para coincidir con tu CSS para el dropdown
     if (profileDropdown) profileDropdown.classList.toggle('open');
 }
 
@@ -62,21 +73,18 @@ if (menuToggle) menuToggle.addEventListener('click', toggleMenu);
 if (overlay) overlay.addEventListener('click', toggleMenu);
 if (profileToggle) profileToggle.addEventListener('click', toggleProfile);
 
-// Cerrar dropdown del perfil al hacer clic fuera
 document.addEventListener('click', (e) => {
-    // Usar 'open' para coincidir con tu CSS para el dropdown
     if (profileToggle && profileDropdown && !profileToggle.contains(e.target) && !profileDropdown.contains(e.target)) {
         profileDropdown.classList.remove('open');
     }
 });
 
-// Cerrar menú al hacer clic en una opción (asumiendo que las opciones de sidebar tienen la clase 'cursor-pointer')
-if (sidebar && overlay) { // Asegurarse de que sidebar y overlay existan
+if (sidebar && overlay) { 
     const menuItems = sidebar.querySelectorAll('.cursor-pointer');
     menuItems.forEach(item => {
         item.addEventListener('click', () => {
-            sidebar.classList.remove('open'); // Usar 'open'
-            overlay.classList.remove('open'); // Usar 'open'
+            sidebar.classList.remove('open'); 
+            overlay.classList.remove('open'); 
         });
     });
 }
@@ -103,22 +111,21 @@ function mostrarNotificacion(mensaje, tipo = 'success') {
 // FUNCIONES PARA LA VISTA DE PARTIDOS
 // ============================
 
-// Función para obtener el nombre de la categoría por su ID
 const getCategoryNameById = (id) => {
     const categoria = allCategorias.find(cat => cat.id_categoria == id);
     return categoria ? categoria.nombre : 'Desconocida';
 };
 
 /**
- * Renderiza los partidos en la tabla HTML.
+ * Renderiza los partidos en la tabla HTML principal.
  * @param {Array} partidosToRender - Array de objetos de partido a mostrar.
  */
 function renderizarTablaPartidos(partidosToRender) {
-    if (!tablaPartidosBody) return; // Asegurarse de que el elemento exista
-    tablaPartidosBody.innerHTML = ''; // Limpiar la tabla
+    if (!tablaPartidosBody) return; 
+    tablaPartidosBody.innerHTML = ''; 
     
     if (partidosToRender.length === 0) {
-        tablaPartidosBody.innerHTML = `  
+        tablaPartidosBody.innerHTML = ` 
             <tr>
                 <td colspan="6" class="px-6 py-8 text-center text-gray-500">
                     <div class="flex flex-col items-center">
@@ -137,11 +144,10 @@ function renderizarTablaPartidos(partidosToRender) {
 
     partidosToRender.forEach(partido => {
         const categoriaNombre = getCategoryNameById(partido.id_categoria);
-        // Desestructurar el resultado para obtener goles a favor y en contra
         const [golesFavor, golesContra] = partido.resultado ? partido.resultado.split('-').map(Number) : [null, null];
         
-        let estadoPartido = 'Pendiente'; // Estado por defecto si no hay resultado o es null
-        let resultadoColorClass = 'bg-blue-100 text-blue-800'; // Default para 'Pendiente'
+        let estadoPartido = 'Pendiente'; 
+        let resultadoColorClass = 'bg-blue-100 text-blue-800'; 
 
         if (golesFavor !== null && golesContra !== null) {
             if (golesFavor > golesContra) {
@@ -180,7 +186,7 @@ function renderizarTablaPartidos(partidosToRender) {
                     <div class="flex items-center">
                         <div class="flex-shrink-0 h-8 w-8">
                             <div class="h-8 w-8 rounded-full bg-gradient-to-r from-gray-400 to-gray-600 flex items-center justify-center">
-                               <span class="text-xs font-bold text-white">${partido.rival ? partido.rival.charAt(0) : '-'}</span>
+                                <span class="text-xs font-bold text-white">${partido.rival ? partido.rival.charAt(0) : '-'}</span>
                             </div>
                         </div>
                         <div class="ml-3">
@@ -278,38 +284,43 @@ function cerrarModalPartido() {
  * @param {number} paso - El paso que se debe mostrar (1 o 2).
  */
 function mostrarPasoModal(paso) {
-    if (!paso1InfoPartido || !paso2EstadisticasJugadores || !btnGuardarPaso1 || !btnAtrasPaso2 || !btnGuardarPaso2 || !modalTitle) {
-        console.error('Error: Elementos del modal no encontrados para controlar los pasos.');
+    // Estas referencias deben ser obtenidas dentro de DOMContentLoaded o la función que las usa
+    const paso1InfoPartidoLocal = document.getElementById('paso1InfoPartido');
+    const paso2EstadisticasJugadoresLocal = document.getElementById('paso2EstadisticasJugadores');
+    const btnGuardarPaso1Local = document.getElementById('btnGuardarPaso1');
+    const btnAtrasPaso2Local = document.getElementById('btnAtrasPaso2');
+    const btnGuardarPaso2Local = document.getElementById('btnGuardarPaso2');
+    const modalTitleLocal = document.getElementById('modalTitle');
+
+
+    if (!paso1InfoPartidoLocal || !paso2EstadisticasJugadoresLocal || !btnGuardarPaso1Local || !btnAtrasPaso2Local || !btnGuardarPaso2Local || !modalTitleLocal) {
+        console.error('Error: Elementos del modal de registro/edición no encontrados para controlar los pasos. Revisa el HTML.');
         return;
     }
 
     if (paso === 1) {
-        paso1InfoPartido.classList.remove('hidden');
-        paso2EstadisticasJugadores.classList.add('hidden');
+        paso1InfoPartidoLocal.classList.remove('hidden');
+        paso2EstadisticasJugadoresLocal.classList.add('hidden');
 
-        btnGuardarPaso1.classList.remove('hidden');
-        btnAtrasPaso2.classList.add('hidden');
-        btnGuardarPaso2.classList.add('hidden');
+        btnGuardarPaso1Local.classList.remove('hidden');
+        btnAtrasPaso2Local.classList.add('hidden');
+        btnGuardarPaso2Local.classList.add('hidden');
 
-        modalTitle.textContent = partidoEditandoId ? 'Editar Partido' : 'Nuevo Partido';
+        modalTitleLocal.textContent = partidoEditandoId ? 'Editar Partido' : 'Nuevo Partido';
 
-        // Es importante que el tipo del botón de Guardar Paso 1 sea submit
-        // para la primera parte del flujo
-        btnGuardarPaso1.type = 'submit'; 
+        btnGuardarPaso1Local.type = 'submit'; 
 
     } else if (paso === 2) {
-        paso1InfoPartido.classList.add('hidden');
-        paso2EstadisticasJugadores.classList.remove('hidden');
+        paso1InfoPartidoLocal.classList.add('hidden');
+        paso2EstadisticasJugadoresLocal.classList.remove('hidden');
 
-        btnGuardarPaso1.classList.add('hidden');
-        btnAtrasPaso2.classList.remove('hidden');
-        btnGuardarPaso2.classList.remove('hidden');
+        btnGuardarPaso1Local.classList.add('hidden');
+        btnAtrasPaso2Local.classList.remove('hidden');
+        btnGuardarPaso2Local.classList.remove('hidden');
 
-        modalTitle.textContent = 'Registrar Estadísticas';
+        modalTitleLocal.textContent = 'Registrar Estadísticas';
 
-        // Cambiar el tipo del botón de Guardar Paso 1 a button
-        // para que no vuelva a enviar el formulario base si se activa por accidente
-        btnGuardarPaso1.type = 'button'; 
+        btnGuardarPaso1Local.type = 'button'; 
     }
 }
 
@@ -319,26 +330,24 @@ function mostrarPasoModal(paso) {
  */
 async function obtenerCategorias() {
     try {
-        const response = await fetch('../api/categoriaAPI.php'); // Asegura esta ruta
+        const response = await fetch('../api/categoriaAPI.php'); 
         if (!response.ok) {
             throw new Error(`Error HTTP: ${response.status}`);
         }
         const data = await response.json();
-        allCategorias = data; // Almacenar categorías globalmente
+        allCategorias = data; 
 
-        // Llenar el select de filtro de categorías
-        if (filterCategoriaSelect) { // Asegurarse de que el elemento exista
+        if (filterCategoriaSelect) { 
             filterCategoriaSelect.innerHTML = '<option value="">Todas las categorías</option>';
         }
-        // Llenar el select de categorías en el modal
-        if (selectCategoriaModal) { // Asegurarse de que el elemento exista
+        if (selectCategoriaModal) { 
             selectCategoriaModal.innerHTML = '<option value="">Seleccionar categoría...</option>';
         }
 
         allCategorias.forEach(categoria => {
             if (filterCategoriaSelect) {
                 const optionFilter = document.createElement('option');
-                optionFilter.value = categoria.id_categoria; // Usar ID para el filtro
+                optionFilter.value = categoria.id_categoria; 
                 optionFilter.textContent = categoria.nombre;
                 filterCategoriaSelect.appendChild(optionFilter);
             }
@@ -361,7 +370,7 @@ async function obtenerCategorias() {
  * @param {string|null} id_categoria - ID de la categoría para filtrar, o null para todos.
  */
 async function obtenerPartidos(id_categoria = null) {
-    let url = '../api/partidosAPI.php'; // RUTA A LA API DE PARTIDOS
+    let url = '../api/partidosAPI.php'; 
     if (id_categoria) {
         url += `?id_categoria=${id_categoria}`;
     }
@@ -396,7 +405,7 @@ async function obtenerPartidos(id_categoria = null) {
  * @param {string} idCategoria - El ID de la categoría del partido.
  */
 async function cargarJugadoresParaEstadisticas(idPartido, idCategoria) {
-    if (!tablaEstadisticasJugadores) return; // Asegurar que el elemento exista
+    if (!tablaEstadisticasJugadores) return; 
 
     tablaEstadisticasJugadores.innerHTML = `
         <tr>
@@ -404,11 +413,11 @@ async function cargarJugadoresParaEstadisticas(idPartido, idCategoria) {
         </tr>
     `;
     try {
-        const response = await fetch(`../api/jugadorAPI.php?id_categoria=${idCategoria}`); // API para jugadores por categoría
+        const response = await fetch(`../api/jugadorAPI.php?id_categoria=${idCategoria}`); 
         if (!response.ok) throw new Error('Error al cargar jugadores de la categoría.');
         const jugadoresCategoria = await response.json();
 
-        tablaEstadisticasJugadores.innerHTML = ''; // Limpiar después de cargar
+        tablaEstadisticasJugadores.innerHTML = ''; 
         if (jugadoresCategoria.length === 0) {
             tablaEstadisticasJugadores.innerHTML = `
                 <tr>
@@ -444,10 +453,6 @@ async function cargarJugadoresParaEstadisticas(idPartido, idCategoria) {
             tablaEstadisticasJugadores.innerHTML += row;
         });
 
-        // NOTA: Para edición, precargar estadísticas de jugador_partido sería más complejo
-        // Implicaría otra API para obtener las estadísticas existentes para este partido y jugador,
-        // y luego llenar los campos y marcar los checkboxes. Lo podemos abordar si lo necesitas.
-
     } catch (error) {
         console.error('Error al cargar jugadores para estadísticas:', error);
         if (tablaEstadisticasJugadores) {
@@ -463,15 +468,10 @@ async function cargarJugadoresParaEstadisticas(idPartido, idCategoria) {
 
 /**
  * Maneja el envío del formulario de partido (crear o actualizar).
- * MODIFICADO PARA MANEJAR LOS PASOS.
  */
 async function handleFormPartidoSubmit(event) {
-    event.preventDefault(); // Siempre prevenir el comportamiento por defecto
+    event.preventDefault(); 
 
-    // Si estamos en el Paso 1 (Información del Partido)
-    // Se usa 'paso1InfoPartido' porque 'handleFormPartidoSubmit' es el listener del FORM
-    // y siempre se dispara sin importar qué botón submit se presione.
-    // Verificamos si el Paso 1 está visible para saber qué acción ejecutar.
     if (paso1InfoPartido && !paso1InfoPartido.classList.contains('hidden')) { 
         const formData = new FormData(formPartido);
         const partidoData = Object.fromEntries(formData.entries());
@@ -500,18 +500,15 @@ async function handleFormPartidoSubmit(event) {
             if (result.success) {
                 mostrarNotificacion(partidoEditandoId ? 'Partido actualizado exitosamente' : 'Partido registrado exitosamente');
                 
-                // Si es un nuevo partido, guardamos el ID para el paso 2
                 if (!partidoEditandoId && result.id_partido) {
                     if (partidoIdInput) partidoIdInput.value = result.id_partido; 
                     partidoEditandoId = result.id_partido; 
                 }
                 
-                // Pasamos al Paso 2: Cargar y mostrar jugadores para estadísticas
                 const categoriaId = partidoData.id_categoria;
                 await cargarJugadoresParaEstadisticas(partidoEditandoId, categoriaId);
-                mostrarPasoModal(2); // Mostrar el Paso 2
+                mostrarPasoModal(2); 
 
-                // Recargar la tabla principal de partidos en segundo plano
                 obtenerPartidos(filterCategoriaSelect.value === '' ? null : filterCategoriaSelect.value); 
 
             } else {
@@ -523,84 +520,131 @@ async function handleFormPartidoSubmit(event) {
             console.error('Error en la petición API al guardar partido:', error);
         }
     } else {
-        // Esto se ejecuta si el formulario se envía desde el Paso 2, pero
-        // el botón "Guardar Estadísticas" es de tipo "button" y tiene su propio listener,
-        // por lo que esta rama solo debería ser un fallback o no ejecutarse.
         console.log("handleFormPartidoSubmit llamado desde Paso 2. Usar btnGuardarPaso2.");
     }
 }
 
 /**
- * Muestra los detalles de un partido en un alert.
+ * Muestra los detalles de un partido en un modal con estadísticas de jugadores.
  * @param {string} id - ID del partido a ver.
  */
-window.verDetallePartido = (id) => {
-    const partido = allPartidos.find(p => p.id_partido == id);
-    if (partido) {
-        const categoriaNombre = getCategoryNameById(partido.id_categoria);
-        alert(`Detalles del Partido:\nID: ${partido.id_partido}\nFecha: ${partido.fecha}\nHora: ${partido.hora ? partido.hora.substring(0, 5) : 'N/A'}\nRival: ${partido.rival}\nLocalía: ${partido.local_visitante}\nResultado: ${partido.resultado}\nCategoría: ${categoriaNombre}`);
-    } else {
-        mostrarNotificacion('Partido no encontrado para ver detalles.', 'error');
-    }
-};
+window.verDetallePartido = async (id) => {
+    // Si por alguna razón las referencias no están establecidas (aunque DOMContentLoaded debería hacerlo)
+    if (!modalDetallePartido || !btnCloseDetalleModal || !detalleFechaHora || !detalleRival || !detalleLocalia || !detalleResultado || !detalleCategoria || !tablaDetalleJugadoresStats) {
+        console.warn('Referencias del modal de detalle no encontradas al llamar a verDetallePartido. Intentando re-obtener.');
+        modalDetallePartido = document.getElementById('modalDetallePartido');
+        btnCloseDetalleModal = document.getElementById('btnCloseDetalleModal');
+        detalleFechaHora = document.getElementById('detalleFechaHora');
+        detalleRival = document.getElementById('detalleRival');
+        detalleLocalia = document.getElementById('detalleLocalia');
+        detalleResultado = document.getElementById('detalleResultado');
+        detalleCategoria = document.getElementById('detalleCategoria');
+        tablaDetalleJugadoresStats = document.getElementById('tablaDetalleJugadoresStats');
 
-/**
- * Abre el modal para editar un partido existente y precarga sus datos.
- * @param {string} id - ID del partido a editar.
- */
-window.editarPartido = (id) => {
-    const partido = allPartidos.find(p => p.id_partido == id);
-    if (!partido) {
-        mostrarNotificacion('Partido no encontrado para editar.', 'error');
-        return;
-    }
-    
-    partidoEditandoId = id; 
-    modalTitle.textContent = 'Editar Partido';
-    
-    if (partidoIdInput) partidoIdInput.value = partido.id_partido; 
-    document.getElementById('fecha').value = partido.fecha;
-    document.getElementById('hora').value = partido.hora || ''; // Pasar la hora completa (HH:MM:SS) o vacío si es null
-    document.getElementById('rival').value = partido.rival;
-    if (document.getElementById('localia')) document.getElementById('localia').value = partido.local_visitante; 
-    
-    const [golesFavor, golesContra] = partido.resultado ? partido.resultado.split('-').map(Number) : ['', ''];
-    if (document.getElementById('goles_favor')) document.getElementById('goles_favor').value = golesFavor;
-    if (document.getElementById('goles_contra')) document.getElementById('goles_contra').value = golesContra;
-    
-    if (document.getElementById('id_categoria')) document.getElementById('id_categoria').value = partido.id_categoria;
-    
-    // Al editar, siempre mostrar el Paso 1 al inicio
-    mostrarPasoModal(1); 
-    if (modalPartido) modalPartido.classList.remove('hidden'); 
-};
-
-/**
- * Elimina un partido de la base de datos.
- * @param {string} id - ID del partido a eliminar.
- * @param {string} rival - Nombre del rival para la confirmación.
- */
-window.eliminarPartido = async (id, rival) => {
-    if (confirm(`¿Estás seguro de que quieres eliminar el partido contra ${rival}? Esta acción es irreversible y eliminará también las estadísticas de los jugadores asociadas.`)) {
-        try {
-            const response = await fetch(`../api/partidosAPI.php?id_partido=${id}`, { 
-                method: 'DELETE'
-            });
-            const result = await response.json();
-
-            if (result.success) {
-                mostrarNotificacion(result.message);
-                obtenerPartidos(filterCategoriaSelect.value === '' ? null : filterCategoriaSelect.value); 
-            } else {
-                mostrarNotificacion(result.message || 'Error al eliminar partido.', 'error');
-                console.error('Error al eliminar partido:', result.message);
-            }
-        } catch (error) {
-            mostrarNotificacion('Error en la comunicación con el servidor al eliminar el partido.', 'error');
-            console.error('Error en la petición API DELETE:', error);
+        if (!modalDetallePartido) { 
+            mostrarNotificacion('Error crítico: El modal de detalle no se pudo encontrar en el DOM.', 'error');
+            console.error('Error: El elemento #modalDetallePartido no existe en el DOM.');
+            return;
         }
     }
+
+    // Limpiar y mostrar "Cargando..."
+    detalleFechaHora.textContent = 'Cargando...';
+    detalleRival.textContent = 'Cargando...';
+    detalleLocalia.textContent = 'Cargando...';
+    detalleResultado.textContent = 'Cargando...';
+    detalleCategoria.textContent = 'Cargando...';
+    tablaDetalleJugadoresStats.innerHTML = `
+        <tr>
+            <td colspan="5" class="px-6 py-4 text-center text-gray-500">Cargando estadísticas de jugadores...</td>
+        </tr>
+    `;
+    modalDetallePartido.classList.remove('hidden'); // Mostrar el modal mientras carga
+
+    try {
+        const response = await fetch(`../api/partidosAPI.php?id_partido_detalle=${id}`); 
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Error al cargar los detalles del partido.');
+        }
+        const data = await response.json();
+
+        if (data.success && data.partido) {
+            const partido = data.partido;
+            const jugadoresStats = data.jugadores_stats;
+
+            // Llenar información general del partido
+            detalleFechaHora.textContent = `${partido.fecha} ${partido.hora ? partido.hora.substring(0, 5) : 'N/A'}`;
+            detalleRival.textContent = partido.rival;
+            detalleLocalia.textContent = partido.local_visitante;
+            detalleResultado.textContent = partido.resultado;
+            detalleCategoria.textContent = partido.categoria_nombre || 'N/A';
+
+            // Llenar tabla de estadísticas de jugadores
+            tablaDetalleJugadoresStats.innerHTML = ''; // Limpiar
+            if (jugadoresStats && jugadoresStats.length > 0) {
+                jugadoresStats.forEach(jugador => {
+                    const row = `
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                ${jugador.nombre} ${jugador.apellido} (${jugador.dorsal ? 'Dorsal: ' + jugador.dorsal : 'N/A'} / ${jugador.posicion || 'N/A'})
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">${jugador.minutos_jugados || 0}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">${jugador.goles || 0}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">${jugador.tarjetas_amarillas || 0}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">${jugador.tarjetas_rojas || 0}</td>
+                        </tr>
+                    `;
+                    tablaDetalleJugadoresStats.innerHTML += row;
+                });
+            } else {
+                tablaDetalleJugadoresStats.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-6 py-4 text-center text-gray-500">No hay estadísticas de jugadores para este partido.</td>
+                    </tr>
+                `;
+            }
+
+        } else {
+            mostrarNotificacion(data.message || 'Error al obtener los detalles del partido.', 'error');
+            modalDetallePartido.classList.add('hidden'); // Ocultar si hay error
+        }
+
+    } catch (error) {
+        console.error('Error en fetch verDetallePartido:', error);
+        mostrarNotificacion(`Error al cargar detalles del partido: ${error.message}.`, 'error');
+        modalDetallePartido.classList.add('hidden'); // Ocultar si hay error
+    }
 };
+
+// Listener para cerrar el modal de detalle
+// Se asegura que los listeners se adjunten solo una vez y solo si los elementos existen.
+let detailModalListenersAttached = false;
+document.addEventListener('DOMContentLoaded', () => {
+    // Estas referencias deben ser obtenidas aquí para los listeners globales
+    modalDetallePartido = document.getElementById('modalDetallePartido');
+    btnCloseDetalleModal = document.getElementById('btnCloseDetalleModal');
+    detalleFechaHora = document.getElementById('detalleFechaHora');
+    detalleRival = document.getElementById('detalleRival');
+    detalleLocalia = document.getElementById('detalleLocalia');
+    detalleResultado = document.getElementById('detalleResultado');
+    detalleCategoria = document.getElementById('detalleCategoria');
+    tablaDetalleJugadoresStats = document.getElementById('tablaDetalleJugadoresStats');
+
+
+    if (!detailModalListenersAttached && modalDetallePartido && btnCloseDetalleModal) {
+        btnCloseDetalleModal.addEventListener('click', () => {
+            modalDetallePartido.classList.add('hidden');
+        });
+        modalDetallePartido.addEventListener('click', (e) => {
+            if (e.target === modalDetallePartido) {
+                modalDetallePartido.classList.add('hidden');
+            }
+        });
+        detailModalListenersAttached = true;
+    }
+});
+
 
 // ============================
 // EVENT LISTENERS DE LA VISTA PARTIDOS
@@ -632,14 +676,13 @@ if (btnGuardarPaso2) btnGuardarPaso2.addEventListener('click', async () => {
     }
 
     const jugadoresStats = [];
-    if (tablaEstadisticasJugadores) { // Asegurarse de que la tabla de stats exista
+    if (tablaEstadisticasJugadores) { 
         const filasJugadores = tablaEstadisticasJugadores.querySelectorAll('tr[data-jugador-id]');
 
         filasJugadores.forEach(fila => {
             const jugadorId = fila.dataset.jugadorId;
             const jugoCheckbox = fila.querySelector(`input[name="jugo_${jugadorId}"]`);
             
-            // Solo procesar si el jugador "jugó" (checkbox marcado)
             if (jugoCheckbox && jugoCheckbox.checked) {
                 const minutosInput = fila.querySelector(`input[name="minutos_${jugadorId}"]`);
                 const golesInput = fila.querySelector(`input[name="goles_${jugadorId}"]`);
@@ -658,10 +701,10 @@ if (btnGuardarPaso2) btnGuardarPaso2.addEventListener('click', async () => {
         });
     }
 
-    console.log("Datos de estadísticas a enviar:", jugadoresStats); // Para depuración
+    console.log("Datos de estadísticas a enviar:", jugadoresStats); 
 
     try {
-        const response = await fetch('../api/jugadorPartidoAPI.php', { // ¡NUEVA API!
+        const response = await fetch('../api/jugadorPartidoAPI.php', { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(jugadoresStats)
@@ -670,9 +713,9 @@ if (btnGuardarPaso2) btnGuardarPaso2.addEventListener('click', async () => {
 
         if (result.success) {
             mostrarNotificacion(result.message || 'Estadísticas guardadas exitosamente.');
-            cerrarModalPartido(); // Cierra el modal al finalizar
-            mostrarPasoModal(1); // Reinicia a Paso 1
-            obtenerPartidos(filterCategoriaSelect.value === '' ? null : filterCategoriaSelect.value); // Recarga tabla principal
+            cerrarModalPartido(); 
+            mostrarPasoModal(1); 
+            obtenerPartidos(filterCategoriaSelect.value === '' ? null : filterCategoriaSelect.value); 
         } else {
             mostrarNotificacion(result.message || 'Error al guardar estadísticas.', 'error');
             console.error('Error al guardar estadísticas:', result.message);
@@ -701,6 +744,6 @@ if (filterCategoriaSelect) {
 document.addEventListener('DOMContentLoaded', () => {
     // Cargar categorías primero, luego partidos
     obtenerCategorias().then(() => {
-        obtenerPartidos(); // Cargar todos los partidos inicialmente
+        obtenerPartidos(); 
     });
 });
