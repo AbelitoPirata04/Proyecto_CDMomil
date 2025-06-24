@@ -13,11 +13,11 @@ const profileToggle = document.getElementById('profileToggle');
 const profileDropdown = document.getElementById('profileDropdown');
 
 // Referencias a elementos de la vista de Partidos
-const tablaPartidosBody = document.getElementById('tablaPartidos');
+const tablaPartidosBody = document.getElementById('tablaPartidos'); // <-- Coge el tbody para delegación de eventos
 const totalPartidosSpan = document.getElementById('totalPartidos');
 const filterCategoriaSelect = document.getElementById('filterCategoria');
 const btnNuevoPartido = document.getElementById('btnNuevoPartido');
-const btnDescargarInforme = document.getElementById('btnDescargarInforme'); // Este es el botón que abre el modal de informe
+const btnDescargarInforme = document.getElementById('btnDescargarInforme');
 
 // Referencias al modal de Partido (Nuevo/Editar)
 const modalPartido = document.getElementById('modalPartido');
@@ -57,6 +57,7 @@ let btnCloseInformeCategoriaModal;
 let selectCategoriaInforme; // El select de categoría dentro del modal de informe
 let btnCancelarInformeCategoria;
 let btnGenerarInforme;
+
 
 // ============================
 // FUNCIONES DE LA INTERFAZ (MENÚ Y DROPDOWN)
@@ -234,15 +235,15 @@ function renderizarTablaPartidos(partidosToRender) {
                             </svg>
                             Ver Detalle
                         </button>
-                        <button onclick="window.editarPartido('${partido.id_partido}')"
-                                class="text-indigo-600 hover:text-indigo-900 transition-colors duration-200 px-3 py-1 rounded-md hover:bg-indigo-50">
+                        <button data-partido-id="${partido.id_partido}"
+                                class="text-indigo-600 hover:text-indigo-900 transition-colors duration-200 px-3 py-1 rounded-md hover:bg-indigo-50 edit-button">
                             <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path>
                             </svg>
                             Editar
                         </button>
-                        <button onclick="window.eliminarPartido('${partido.id_partido}', '${partido.rival}')"
-                                class="text-red-600 hover:text-red-900 transition-colors duration-200 px-3 py-1 rounded-md hover:bg-red-50">
+                        <button data-partido-id="${partido.id_partido}" data-rival-nombre="${partido.rival}"
+                                class="text-red-600 hover:text-red-900 transition-colors duration-200 px-3 py-1 rounded-md hover:bg-red-50 delete-button">
                             <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd"></path>
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 012 0v4a1 1 0 11-2 0V7zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V7a1 1 0 00-1-1z" clip-rule="evenodd"></path>
@@ -273,6 +274,7 @@ function abrirModalNuevoPartido() {
     formPartido.reset(); // Limpiar el formulario
     if (partidoIdInput) partidoIdInput.value = ''; // Asegurarse de que el campo oculto de ID esté vacío
     if (modalPartido) modalPartido.classList.remove('hidden'); // Mostrar el modal
+    mostrarPasoModal(1); // Asegurar que siempre empieza en el Paso 1
 }
 
 /**
@@ -282,6 +284,7 @@ function cerrarModalPartido() {
     if (modalPartido) modalPartido.classList.add('hidden'); // Ocultar el modal
     if (formPartido) formPartido.reset(); // Resetear el formulario
     partidoEditandoId = null; // Limpiar el ID de partido en edición
+    mostrarPasoModal(1); // Resetear a Paso 1 al cerrar
 }
 
 /**
@@ -289,14 +292,12 @@ function cerrarModalPartido() {
  * @param {number} paso - El paso que se debe mostrar (1 o 2).
  */
 function mostrarPasoModal(paso) {
-    // Estas referencias deben ser obtenidas dentro de DOMContentLoaded o la función que las usa
     const paso1InfoPartidoLocal = document.getElementById('paso1InfoPartido');
     const paso2EstadisticasJugadoresLocal = document.getElementById('paso2EstadisticasJugadores');
     const btnGuardarPaso1Local = document.getElementById('btnGuardarPaso1');
     const btnAtrasPaso2Local = document.getElementById('btnAtrasPaso2');
     const btnGuardarPaso2Local = document.getElementById('btnGuardarPaso2');
     const modalTitleLocal = document.getElementById('modalTitle');
-
 
     if (!paso1InfoPartidoLocal || !paso2EstadisticasJugadoresLocal || !btnGuardarPaso1Local || !btnAtrasPaso2Local || !btnGuardarPaso2Local || !modalTitleLocal) {
         console.error('Error: Elementos del modal de registro/edición no encontrados para controlar los pasos. Revisa el HTML.');
@@ -312,9 +313,7 @@ function mostrarPasoModal(paso) {
         btnGuardarPaso2Local.classList.add('hidden');
 
         modalTitleLocal.textContent = partidoEditandoId ? 'Editar Partido' : 'Nuevo Partido';
-
         btnGuardarPaso1Local.type = 'submit';
-
     } else if (paso === 2) {
         paso1InfoPartidoLocal.classList.add('hidden');
         paso2EstadisticasJugadoresLocal.classList.remove('hidden');
@@ -324,7 +323,6 @@ function mostrarPasoModal(paso) {
         btnGuardarPaso2Local.classList.remove('hidden');
 
         modalTitleLocal.textContent = 'Registrar Estadísticas';
-
         btnGuardarPaso1Local.type = 'button';
     }
 }
@@ -388,7 +386,8 @@ async function obtenerCategorias() {
  */
 async function obtenerPartidos(id_categoria = null) {
     let url = '../api/partidosAPI.php';
-    if (id_categoria) {
+    // Si se pasa un ID de categoría y no es el valor por defecto "0" (Todas)
+    if (id_categoria !== null && id_categoria !== "" && id_categoria !== "0") {
         url += `?id_categoria=${id_categoria}`;
     }
     try {
@@ -483,6 +482,7 @@ async function cargarJugadoresParaEstadisticas(idPartido, idCategoria) {
     }
 }
 
+
 /**
  * Maneja el envío del formulario de partido (crear o actualizar).
  */
@@ -543,11 +543,10 @@ async function handleFormPartidoSubmit(event) {
 
 /**
  * Muestra los detalles de un partido en un modal con estadísticas de jugadores.
+ * Se mantiene en window.verDetallePartido porque el onclick ya funciona.
  * @param {string} id - ID del partido a ver.
  */
 window.verDetallePartido = async (id) => {
-    // Obtener referencias de elementos del modal de detalle DENTRO de la función
-    // Esto asegura que los elementos ya están en el DOM cuando se intenta acceder.
     const modalDetallePartidoLocal = document.getElementById('modalDetallePartido');
     const btnCloseDetalleModalLocal = document.getElementById('btnCloseDetalleModal');
     const detalleFechaHoraLocal = document.getElementById('detalleFechaHora');
@@ -632,26 +631,78 @@ window.verDetallePartido = async (id) => {
     }
 };
 
-// Listener para cerrar el modal de detalle
-// Se asegura que los listeners se adjunten solo una vez y solo si los elementos existen.
-let detailModalListenersAttached = false;
-document.addEventListener('DOMContentLoaded', () => {
-    // Estas referencias deben ser obtenidas aquí para los listeners globales
-    const modalDetallePartidoGlobal = document.getElementById('modalDetallePartido');
-    const btnCloseDetalleModalGlobal = document.getElementById('btnCloseDetalleModal');
+/**
+ * Lógica para editar un partido existente.
+ * NO es una función global de window, se llama internamente por la delegación de eventos.
+ * @param {string} id - ID del partido a editar.
+ */
+async function handleEditarPartido(id) {
+    partidoEditandoId = id;
+    modalTitle.textContent = 'Editar Partido';
+    formPartido.reset(); // Limpiar el formulario
+    if (partidoIdInput) partidoIdInput.value = id; // Setear el ID del partido
 
-    if (!detailModalListenersAttached && modalDetallePartidoGlobal && btnCloseDetalleModalGlobal) {
-        btnCloseDetalleModalGlobal.addEventListener('click', () => {
-            modalDetallePartidoGlobal.classList.add('hidden');
-        });
-        modalDetallePartidoGlobal.addEventListener('click', (e) => {
-            if (e.target === modalDetallePartidoGlobal) {
-                modalDetallePartidoGlobal.classList.add('hidden');
-            }
-        });
-        detailModalListenersAttached = true;
+    // Volver al paso 1 al editar
+    mostrarPasoModal(1);
+
+    try {
+        const response = await fetch(`../api/partidosAPI.php?id_partido_detalle=${id}`); // Reutilizamos la API de detalle
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Error al cargar los datos del partido para editar.');
+        }
+        const data = await response.json();
+
+        if (data.success && data.partido) {
+            const partido = data.partido;
+            // Llenar los campos del formulario con los datos del partido
+            document.getElementById('fecha').value = partido.fecha;
+            document.getElementById('hora').value = partido.hora.substring(0, 5); // Solo hora y minutos
+            document.getElementById('rival').value = partido.rival;
+            document.getElementById('localia').value = partido.local_visitante;
+            document.getElementById('id_categoria').value = partido.id_categoria;
+            const [golesFavor, golesContra] = partido.resultado.split('-').map(Number);
+            document.getElementById('goles_favor').value = golesFavor;
+            document.getElementById('goles_contra').value = golesContra;
+
+            if (modalPartido) modalPartido.classList.remove('hidden'); // Mostrar el modal
+        } else {
+            mostrarNotificacion(data.message || 'No se pudieron cargar los datos del partido para editar.', 'error');
+        }
+    } catch (error) {
+        console.error('Error al cargar datos para edición:', error);
+        mostrarNotificacion(`Error al cargar datos del partido para editar: ${error.message}.`, 'error');
     }
-});
+}
+
+
+/**
+ * Lógica para eliminar un partido.
+ * NO es una función global de window, se llama internamente por la delegación de eventos.
+ * @param {string} id - ID del partido a eliminar.
+ * @param {string} rival - Nombre del rival para la confirmación.
+ */
+async function handleEliminarPartido(id, rival) {
+    if (confirm(`¿Estás seguro de que quieres eliminar el partido contra "${rival}"? Esto también eliminará las estadísticas de jugadores asociadas.`)) {
+        try {
+            const response = await fetch(`../api/partidosAPI.php?id_partido=${id}`, {
+                method: 'DELETE'
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                mostrarNotificacion('Partido eliminado exitosamente.');
+                obtenerPartidos(filterCategoriaSelect.value === '' ? null : filterCategoriaSelect.value); // Recargar la tabla
+            } else {
+                mostrarNotificacion(result.message || 'Error al eliminar el partido.', 'error');
+                console.error('Error al eliminar partido:', result.message);
+            }
+        } catch (error) {
+            mostrarNotificacion('Error de comunicación al eliminar el partido.', 'error');
+            console.error('Error en la petición API al eliminar partido:', error);
+        }
+    }
+}
 
 
 // ============================
@@ -661,18 +712,16 @@ document.addEventListener('DOMContentLoaded', () => {
 // Botones de acción del panel
 if (btnNuevoPartido) btnNuevoPartido.addEventListener('click', () => {
     abrirModalNuevoPartido();
-    mostrarPasoModal(1); // Siempre empezar en el Paso 1 al abrir el modal
 });
 
-// **NUEVO LÓGICA PARA btnDescargarInforme - ABRIR EL MODAL DE SELECCIÓN DE CATEGORÍA**
+// LÓGICA PARA btnDescargarInforme - ABRIR EL MODAL DE SELECCIÓN DE CATEGORÍA
 if (btnDescargarInforme) {
     btnDescargarInforme.addEventListener('click', () => {
         if (modalInformeCategoria) {
             // Asegúrate de que el select de categorías para el informe esté actualizado
-            // Esto se hace en obtenerCategorias(), pero si se llamó antes de que existiera el modal,
-            // podría no haberse llenado. Lo garantizamos aquí.
-            if (selectCategoriaInforme.options.length <= 1) { // Si solo tiene "Todas las categorías"
-                selectCategoriaInforme.innerHTML = '<option value="">Todas las categorías</option>';
+            // Re-llenar el select de informe por si hay nuevas categorías
+            if (selectCategoriaInforme) {
+                selectCategoriaInforme.innerHTML = '<option value="">Todas las categorías</option>'; // Opción para informe general
                 allCategorias.forEach(categoria => {
                     const optionInforme = document.createElement('option');
                     optionInforme.value = categoria.id_categoria;
@@ -692,7 +741,6 @@ if (btnDescargarInforme) {
 // Botones del modal (btnCancelarModal se mantiene igual, cierra el modal)
 if (btnCancelarModal) btnCancelarModal.addEventListener('click', () => {
     cerrarModalPartido();
-    mostrarPasoModal(1); // Resetear a Paso 1 al cerrar
 });
 
 // Botón "Atrás" en el Paso 2
@@ -747,7 +795,6 @@ if (btnGuardarPaso2) btnGuardarPaso2.addEventListener('click', async () => {
         if (result.success) {
             mostrarNotificacion(result.message || 'Estadísticas guardadas exitosamente.');
             cerrarModalPartido();
-            mostrarPasoModal(1);
             obtenerPartidos(filterCategoriaSelect.value === '' ? null : filterCategoriaSelect.value);
         } else {
             mostrarNotificacion(result.message || 'Error al guardar estadísticas.', 'error');
@@ -772,10 +819,14 @@ if (filterCategoriaSelect) {
 }
 
 // ============================
-// INICIALIZACIÓN
+// INICIALIZACIÓN Y LISTENERS GLOBALES (se ejecutan una vez al cargar el DOM)
 // ============================
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Referencias para el modal de detalle de partido
+    modalDetallePartido = document.getElementById('modalDetallePartido');
+    btnCloseDetalleModal = document.getElementById('btnCloseDetalleModal');
+
     // Referencias para el modal de informe (asegúrate de que existen)
     modalInformeCategoria = document.getElementById('modalInformeCategoria');
     btnCloseInformeCategoriaModal = document.getElementById('btnCloseInformeCategoriaModal');
@@ -788,19 +839,31 @@ document.addEventListener('DOMContentLoaded', () => {
         obtenerPartidos();
     });
 
-    // Listener para cerrar el modal de selección de categoría para informe
-    if (btnCloseInformeCategoriaModal) {
-        btnCloseInformeCategoriaModal.addEventListener('click', () => {
-            if (modalInformeCategoria) modalInformeCategoria.classList.add('hidden');
+    // Listener para cerrar el modal de detalle de partido
+    if (modalDetallePartido && btnCloseDetalleModal) {
+        btnCloseDetalleModal.addEventListener('click', () => {
+            modalDetallePartido.classList.add('hidden');
         });
-    }
-    if (btnCancelarInformeCategoria) {
-        btnCancelarInformeCategoria.addEventListener('click', () => {
-            if (modalInformeCategoria) modalInformeCategoria.classList.add('hidden');
+        modalDetallePartido.addEventListener('click', (e) => {
+            if (e.target === modalDetallePartido) {
+                modalDetallePartido.classList.add('hidden');
+            }
         });
     }
 
-    // **LÓGICA PRINCIPAL DEL BOTÓN GENERAR INFORME DEL MODAL**
+    // Listener para cerrar el modal de selección de categoría para informe
+    if (modalInformeCategoria && btnCloseInformeCategoriaModal) {
+        btnCloseInformeCategoriaModal.addEventListener('click', () => {
+            modalInformeCategoria.classList.add('hidden');
+        });
+    }
+    if (modalInformeCategoria && btnCancelarInformeCategoria) {
+        btnCancelarInformeCategoria.addEventListener('click', () => {
+            modalInformeCategoria.classList.add('hidden');
+        });
+    }
+
+    // LÓGICA PRINCIPAL DEL BOTÓN GENERAR INFORME DEL MODAL
     if (btnGenerarInforme) {
         btnGenerarInforme.addEventListener('click', () => {
             const categoriaIdParaInforme = selectCategoriaInforme.value; // Puede ser "" para todas las categorías
@@ -815,6 +878,33 @@ document.addEventListener('DOMContentLoaded', () => {
             // Oculta el modal de selección de categoría inmediatamente.
             if (modalInformeCategoria) {
                 modalInformeCategoria.classList.add('hidden');
+            }
+        });
+    }
+
+    // ************************************************
+    // ***** DELEGACIÓN DE EVENTOS PARA EDITAR Y ELIMINAR *****
+    // Este listener se adjunta UNA SOLA VEZ al cuerpo de la tabla (tablaPartidosBody).
+    // Escucha los clics en los botones 'Editar' y 'Eliminar' dinámicamente.
+    // ************************************************
+    if (tablaPartidosBody) {
+        tablaPartidosBody.addEventListener('click', (event) => {
+            // Usa .closest() para encontrar el botón que fue clicado, o un ancestro con la clase específica.
+            // Esto es más robusto que event.target si el clic es en un icono dentro del botón.
+            const targetButton = event.target.closest('button');
+
+            // Asegurarse de que se hizo clic en un botón válido y no en otra parte de la tabla.
+            if (targetButton) {
+                const partidoId = targetButton.dataset.partidoId; // Obtiene el ID del data-attribute
+                const rivalNombre = targetButton.dataset.rivalNombre; // Obtiene el nombre del rival del data-attribute
+
+                if (targetButton.classList.contains('edit-button')) {
+                    // Llamar a la función que maneja la edición
+                    handleEditarPartido(partidoId);
+                } else if (targetButton.classList.contains('delete-button')) {
+                    // Llamar a la función que maneja la eliminación
+                    handleEliminarPartido(partidoId, rivalNombre);
+                }
             }
         });
     }
